@@ -9,7 +9,12 @@ import (
 	"strings"
 )
 
-const maxTitleLen = 500
+const (
+	maxTitleLen = 500
+	// When more than maxTodos exist, the oldest trimCount are deleted.
+	maxTodos  = 100
+	trimCount = 50
+)
 
 type handler struct {
 	store Store
@@ -74,6 +79,12 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		serverError(w, err)
 		return
+	}
+	// The new todo is the newest, so it is never among those trimmed.
+	if n, err := h.store.Trim(r.Context(), maxTodos, trimCount); err != nil {
+		log.Printf("trim: %v", err)
+	} else if n > 0 {
+		log.Printf("trim: deleted %d oldest todos", n)
 	}
 	writeJSON(w, http.StatusCreated, t)
 }

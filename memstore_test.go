@@ -60,3 +60,17 @@ func (m *memStore) Delete(ctx context.Context, id int64) error {
 	}
 	return ErrNotFound
 }
+
+// Trim drops the oldest n todos (todos are kept in creation order).
+func (m *memStore) Trim(ctx context.Context, max, n int) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.todos) <= max {
+		return 0, nil
+	}
+	if n > len(m.todos) {
+		n = len(m.todos)
+	}
+	m.todos = append([]Todo(nil), m.todos[n:]...)
+	return int64(n), nil
+}

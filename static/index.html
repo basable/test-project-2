@@ -4,18 +4,58 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Todos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <div class="blob blob-a"></div>
+  <div class="blob blob-b"></div>
+  <div class="blob blob-c"></div>
+
   <main class="card">
-    <h1>Todos</h1>
-    <form id="new-todo">
-      <input id="title" type="text" placeholder="What needs to be done?" maxlength="500" autocomplete="off" required>
-      <button type="submit">Add</button>
+    <header class="hero">
+      <div>
+        <p class="eyebrow" id="today"></p>
+        <h1>My Tasks</h1>
+      </div>
+      <div class="ring" id="ring" title="Completed">
+        <svg viewBox="0 0 36 36">
+          <circle class="ring-bg" cx="18" cy="18" r="15.9"></circle>
+          <circle class="ring-fg" id="ring-fg" cx="18" cy="18" r="15.9"></circle>
+        </svg>
+        <span id="ring-label">0%</span>
+      </div>
+    </header>
+
+    <form id="new-todo" class="composer">
+      <span class="composer-icon">+</span>
+      <input id="title" type="text" placeholder="Add a new task…" maxlength="500" autocomplete="off" required>
+      <button type="submit">Add task</button>
     </form>
-    <ul id="list"></ul>
-    <footer id="status"></footer>
+
+    <nav class="filters" id="filters">
+      <button data-filter="all" class="active">All <em id="c-all">0</em></button>
+      <button data-filter="active">Active <em id="c-active">0</em></button>
+      <button data-filter="done">Done <em id="c-done">0</em></button>
+    </nav>
+
+    <ul id="list" class="list"></ul>
+
+    <div id="empty" class="empty" hidden>
+      <div class="empty-art">✨</div>
+      <p class="empty-title">All clear!</p>
+      <p class="empty-sub" id="empty-sub">Add your first task above to get started.</p>
+    </div>
+
+    <footer class="foot">
+      <span id="status">Loading…</span>
+      <span class="hint">Double-click a task to edit · keeps the newest 100</span>
+    </footer>
   </main>
+
+  <div id="toast" class="toast" role="alert"></div>
   <script src="/app.js"></script>
 </body>
 </html>

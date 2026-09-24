@@ -1,7 +1,8 @@
-const list = document.getElementById("list");
-const form = document.getElementById("new-todo");
-const input = document.getElementById("title");
-const statusEl = document.getElementById("status");
+const $ = (id) => document.getElementById(id);
+const list = $("list"), form = $("new-todo"), input = $("title");
+let todos = [];
+let filter = "all";
+let toastTimer;
 
 async function api(method, path, body) {
   const res = await fetch(path, {
@@ -16,46 +17,120 @@ async function api(method, path, body) {
   return res.status === 204 ? null : res.json();
 }
 
-function showError(err) {
-  statusEl.textContent = "Error: " + err.message;
-  statusEl.className = "error";
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
+}
+const showError = (err) => toast("⚠️ " + err.message);
+
+function ago(iso) {
+  const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return "just now";
+  const units = [["y", 31536000], ["mo", 2592000], ["d", 86400], ["h", 3600], ["m", 60]];
+  for (const [u, n] of units) if (s >= n) return `${Math.floor(s / n)}${u} ago`;
 }
 
-function render(todos) {
-  list.replaceChildren();
-  for (const todo of todos) {
-    const li = document.createElement("li");
-    li.className = todo.done ? "done" : "";
+function startEdit(li, span, todo) {
+  const edit = document.createElement("input");
+  edit.className = "edit";
+  edit.value = todo.title;
+  edit.maxLength = 500;
+  span.replaceWith(edit);
+  edit.focus();
+  edit.select();
+  let finished = false;
+  const finish = (save) => {
+    if (finished) return;
+    finished = true;
+    const title = edit.value.trim();
+    if (save && title && title !== todo.title) {
+      api("PATCH", `/api/todos/${todo.id}`, { title }).then(load).catch(showError);
+    } else render();
+  };
+  edit.addEventListener("blur", () => finish(true));
+  edit.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") finish(true);
+    if (e.key === "Escape") finish(false);
+  });
+}
 
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = todo.done;
-    cb.addEventListener("change", () =>
-      api("PATCH", `/api/todos/${todo.id}`, { done: cb.checked }).then(load).catch(showError)
-    );
+function item(todo) {
+  const li = document.createElement("li");
+  li.className = "item" + (todo.done ? " done" : "");
 
-    const span = document.createElement("span");
-    span.textContent = todo.title;
+  const check = document.createElement("button");
+  check.className = "check";
+  check.setAttribute("aria-label", todo.done ? "Mark as not done" : "Mark as done");
+  check.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  check.addEventListener("click", () =>
+    api("PATCH", `/api/todos/${todo.id}`, { done: !todo.done }).then(load).catch(showError));
 
-    const del = document.createElement("button");
-    del.className = "delete";
-    del.textContent = "\u00d7";
-    del.title = "Delete";
-    del.addEventListener("click", () =>
-      api("DELETE", `/api/todos/${todo.id}`).then(load).catch(showError)
-    );
+  const body = document.createElement("div");
+  body.className = "body";
+  const span = document.createElement("span");
+  span.className = "text";
+  span.textContent = todo.title;
+  span.addEventListener("dblclick", () => startEdit(li, span, todo));
+  const meta = document.createElement("small");
+  meta.textContent = ago(todo.created_at);
+  meta.title = new Date(todo.created_at).toLocaleString();
+  body.append(span, meta);
 
-    li.append(cb, span, del);
-    list.append(li);
-  }
-  const left = todos.filter((t) => !t.done).length;
-  statusEl.className = "";
-  statusEl.textContent = todos.length ? `${left} of ${todos.length} remaining` : "Nothing to do yet.";
+  const del = document.createElement("button");
+  del.className = "delete";
+  del.setAttribute("aria-label", "Delete");
+  del.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  del.addEventListener("click", () => {
+    li.classList.add("leaving");
+    setTimeout(() => api("DELETE", `/api/todos/${todo.id}`).then(load).catch(showError), 200);
+  });
+
+  li.append(check, body, del);
+  return li;
+}
+
+function render() {
+  const done = todos.filter((t) => t.done).length;
+  const active = todos.length - done;
+  $("c-all").textContent = todos.length;
+  $("c-active").textContent = active;
+  $("c-done").textContent = done;
+
+  const pct = todos.length ? Math.round((done / todos.length) * 100) : 0;
+  $("ring-fg").style.strokeDasharray = `${pct} 100`;
+  $("ring-label").textContent = pct + "%";
+
+  // Newest first.
+  const shown = todos
+    .filter((t) => filter === "all" || (filter === "done" ? t.done : !t.done))
+    .slice()
+    .reverse();
+  list.replaceChildren(...shown.map(item));
+
+  $("empty").hidden = shown.length > 0;
+  $("empty-sub").textContent = todos.length === 0
+    ? "Add your first task above to get started."
+    : filter === "done" ? "Nothing completed yet — you've got this." : "Everything is done. Enjoy the moment!";
+  $("status").textContent = todos.length
+    ? `${active} task${active === 1 ? "" : "s"} left`
+    : "No tasks";
 }
 
 async function load() {
-  render(await api("GET", "/api/todos"));
+  todos = await api("GET", "/api/todos");
+  render();
 }
+
+$("filters").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-filter]");
+  if (!btn) return;
+  filter = btn.dataset.filter;
+  for (const b of $("filters").children) b.classList.toggle("active", b === btn);
+  render();
+});
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -70,4 +145,7 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
+$("today").textContent = new Date().toLocaleDateString(undefined, {
+  weekday: "long", month: "long", day: "numeric",
+});
 load().catch(showError);

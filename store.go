@@ -24,4 +24,7 @@ type Store interface {
 	Create(ctx context.Context, title string) (Todo, error)
 	Update(ctx context.Context, id int64, title *string, done *bool) (Todo, error)
 	Delete(ctx context.Context, id int64) error
+	// Trim deletes the oldest n todos when more than max exist and
+	// returns how many were deleted.
+	Trim(ctx context.Context, max, n int) (int64, error)
 }
